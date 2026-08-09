@@ -1,0 +1,247 @@
+```yaml
+name: Sync NovaPlay Icons
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Ejecutar cada 6 horas
+    - cron: "0 */6 * * *"
+
+  push:
+    paths:
+      - ".github/workflows/sync-icons.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync-icons:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install requests pillow
+
+      - name: Download and convert icons to WebP
+        run: |
+          python <<'PY'
+          import json
+          import os
+          import hashlib
+          import requests
+
+          from io import BytesIO
+          from PIL import Image
+
+          JSON_URL = "https://mrghnngupolsgatcmevw.supabase.co/storage/v1/object/public/Novaplay/novaplay.json"
+
+          ICON_DIR = "icons"
+
+          os.makedirs(ICON_DIR, exist_ok=True)
+
+          print("======================================")
+          print("   NOVAPLAY ICON SYNC")
+          print("======================================")
+
+          # ---------------------------------------
+          # Descargar JSON
+          # ---------------------------------------
+
+          print("Descargando novaplay.json...")
+
+          response = requests.get(
+              JSON_URL,
+              timeout=30
+          )
+
+          response.raise_for_status()
+
+          data = response.json()
+
+          # ---------------------------------------
+          # Buscar todos los iconos
+          # ---------------------------------------
+
+          icon_urls = []
+
+          def extract_icons(obj):
+
+              if isinstance(obj, dict):
+
+                  for key, value in obj.items():
+
+                      if key == "icono":
+
+                          if isinstance(value, str):
+
+                              if value.startswith(("http://", "https://")):
+
+                                  icon_urls.append(value)
+
+                      extract_icons(value)
+
+              elif isinstance(obj, list):
+
+                  for item in obj:
+
+                      extract_icons(item)
+
+
+          extract_icons(data)
+
+          # Eliminar duplicados
+          icon_urls = list(dict.fromkeys(icon_urls))
+
+          print(f"Iconos encontrados: {len(icon_urls)}")
+
+          # ---------------------------------------
+          # Descargar y convertir
+          # ---------------------------------------
+
+          session = requests.Session()
+
+          successful = 0
+          failed = 0
+
+          index = []
+
+          for number, url in enumerate(icon_urls, start=1):
+
+              try:
+
+                  print()
+                  print(f"[{number}/{len(icon_urls)}]")
+                  print(url)
+
+                  # Nombre basado en la URL
+                  url_hash = hashlib.sha256(
+                      url.encode("utf-8")
+                  ).hexdigest()[:16]
+
+                  filename = f"{url_hash}.webp"
+
+                  output_path = os.path.join(
+                      ICON_DIR,
+                      filename
+                  )
+
+                  # Descargar imagen
+                  image_response = session.get(
+                      url,
+                      timeout=30
+                  )
+
+                  image_response.raise_for_status()
+
+                  if not image_response.content:
+
+                      raise Exception("La imagen está vacía")
+
+                  # Abrir imagen
+                  image = Image.open(
+                      BytesIO(image_response.content)
+                  )
+
+                  # -----------------------------------
+                  # Convertir correctamente a WebP
+                  # -----------------------------------
+
+                  # Si tiene transparencia, usar RGBA
+                  if image.mode in ("RGBA", "LA"):
+
+                      image = image.convert("RGBA")
+
+                  else:
+
+                      image = image.convert("RGB")
+
+                  # -----------------------------------
+                  # Guardar WebP
+                  # -----------------------------------
+
+                  image.save(
+                      output_path,
+                      "WEBP",
+                      quality=90,
+                      method=6
+                  )
+
+                  # Obtener tamaño
+                  size_kb = os.path.getsize(output_path) / 1024
+
+                  print(
+                      f"OK -> {filename} "
+                      f"({size_kb:.1f} KB)"
+                  )
+
+                  index.append({
+                      "icono": url,
+                      "archivo": filename
+                  })
+
+                  successful += 1
+
+              except Exception as error:
+
+                  print(
+                      f"ERROR -> {error}"
+                  )
+
+                  failed += 1
+
+          # ---------------------------------------
+          # Crear index.json
+          # ---------------------------------------
+
+          with open(
+              os.path.join(ICON_DIR, "index.json"),
+              "w",
+              encoding="utf-8"
+          ) as file:
+
+              json.dump(
+                  index,
+                  file,
+                  ensure_ascii=False,
+                  indent=2
+              )
+
+          print()
+          print("======================================")
+          print("RESULTADO")
+          print("======================================")
+          print(f"Encontrados : {len(icon_urls)}")
+          print(f"Convertidos : {successful}")
+          print(f"Errores     : {failed}")
+          print("======================================")
+
+          PY
+
+      - name: Show changes
+        run: |
+          git status --short
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add icons/
+
+          if git diff --cached --quiet; then
+            echo "No hay cambios en los iconos."
+          else
+            git commit -m "Update NovaPlay icons"
+            git push
+          fi
+```
