@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -21,10 +21,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Pillow
+      - name: Install dependencies
         run: pip install requests pillow
 
-      - name: Sync icons
+      - name: Run icon synchronizer
         run: python sync_icons.py
 
       - name: Commit changes
@@ -34,4 +34,3 @@ jobs:
           git add icons/
           git diff --cached --quiet || git commit -m "Update NovaPlay icons"
           git push
-```
