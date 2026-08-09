@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - novaplay.json
+      - "novaplay.json"
 
 permissions:
   contents: write
@@ -17,17 +17,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Dependencies
+      - name: Install dependencies
         run: pip install requests pillow
 
-      - name: Sync
+      - name: Sync icons
         run: python -u sync_icons.py
 
-      - name: Commit
-        run: git add icons && git diff --cached --quiet || (git commit -m "Update icons" && git push)
-```
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add icons
+          if git diff --cached --quiet; then
+            echo "No hay cambios."
+          else
+            git commit -m "Update NovaPlay icons"
+            git push
+          fi
