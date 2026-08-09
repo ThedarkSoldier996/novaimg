@@ -1,57 +1,153 @@
+```python
 import os
 import json
-import hashlib
 import requests
 
 from io import BytesIO
 from PIL import Image
 
-JSON_URL = "https://mrghnngupolsgatcmevw.supabase.co/storage/v1/object/public/Novaplay/novaplay.json"
 
+JSON_FILE = "novaplay.json"
 ICON_DIR = "icons"
 
 os.makedirs(ICON_DIR, exist_ok=True)
 
-print("======================================")
-print("       NOVAPLAY ICON SYNC")
-print("======================================")
-
-# Descargar JSON
-print("Descargando novaplay.json...")
-
-response = requests.get(JSON_URL, timeout=60)
-response.raise_for_status()
-
-data = response.json()
-
-# Buscar todos los iconos
-icon_urls = []
+print("======================================", flush=True)
+print("       NOVAPLAY ICON SYNC", flush=True)
+print("======================================", flush=True)
 
 
-def extract_icons(obj):
+# ==================================================
+# LEER NOVAPLAY.JSON
+# ==================================================
+
+print(
+    f"Leyendo {JSON_FILE}...",
+    flush=True
+)
+
+with open(
+    JSON_FILE,
+    "r",
+    encoding="utf-8"
+) as file:
+
+    data = json.load(file)
+
+
+print(
+    "JSON cargado correctamente.",
+    flush=True
+)
+
+
+# ==================================================
+# BUSCAR CANALES
+# ==================================================
+
+channels = []
+
+
+def extract_channels(obj):
+
     if isinstance(obj, dict):
-        for key, value in obj.items():
 
-            if key == "icono":
-                if (
-                    isinstance(value, str)
-                    and value.startswith(("http://", "https://"))
-                ):
-                    icon_urls.append(value)
+        if (
+            "canal" in obj
+            and "icono" in obj
+        ):
 
-            extract_icons(value)
+            canal = obj.get("canal")
+            nombre = obj.get("name", "")
+            icono = obj.get("icono")
+
+            if (
+                canal is not None
+                and isinstance(icono, str)
+                and icono.startswith(
+                    ("http://", "https://")
+                )
+            ):
+
+                channels.append({
+                    "canal": str(canal),
+                    "name": str(nombre),
+                    "icono": icono
+                })
+
+
+        for value in obj.values():
+            extract_channels(value)
+
 
     elif isinstance(obj, list):
+
         for item in obj:
-            extract_icons(item)
+            extract_channels(item)
 
 
-extract_icons(data)
+extract_channels(data)
 
-# Eliminar duplicados
-icon_urls = list(dict.fromkeys(icon_urls))
 
-print(f"Iconos encontrados: {len(icon_urls)}")
+print(
+    f"Canales encontrados: {len(channels)}",
+    flush=True
+)
+
+
+# ==================================================
+# ELIMINAR DUPLICADOS DE CANAL
+# ==================================================
+
+unique = {}
+duplicates = set()
+
+for channel in channels:
+
+    canal = channel["canal"]
+
+    if canal in unique:
+
+        duplicates.add(canal)
+
+    else:
+
+        unique[canal] = channel
+
+
+channels = list(unique.values())
+
+
+if duplicates:
+
+    print(
+        "Canales duplicados:",
+        ", ".join(sorted(duplicates)),
+        flush=True
+    )
+
+
+# ==================================================
+# ORDENAR POR CANAL
+# ==================================================
+
+def sort_channel(channel):
+
+    try:
+        return int(channel["canal"])
+
+    except ValueError:
+        return 999999
+
+
+channels.sort(
+    key=sort_channel
+)
+
+
+# ==================================================
+# DESCARGAR Y CONVERTIR
+# ==================================================
 
 session = requests.Session()
 
@@ -60,46 +156,105 @@ failed = 0
 
 index = []
 
-for number, url in enumerate(icon_urls, start=1):
+
+for channel in channels:
+
+    canal = channel["canal"]
+    name = channel["name"]
+    url = channel["icono"]
+
+
+    print("", flush=True)
+
+    print(
+        f"Canal {canal} - {name}",
+        flush=True
+    )
+
 
     try:
-        print(f"[{number}/{len(icon_urls)}] {url}")
 
-        # Hash estable basado en la URL
-        url_hash = hashlib.sha256(
-            url.encode("utf-8")
-        ).hexdigest()[:16]
+        # ------------------------------------------
+        # Número del archivo
+        # ------------------------------------------
 
-        filename = f"{url_hash}.webp"
+        canal_number = int(canal)
+
+        filename = (
+            f"{canal_number:03d}.webp"
+        )
 
         output_path = os.path.join(
             ICON_DIR,
             filename
         )
 
+
+        print(
+            f"Archivo: {filename}",
+            flush=True
+        )
+
+
+        # ------------------------------------------
         # Descargar
-        image_response = session.get(
+        # ------------------------------------------
+
+        print(
+            "Descargando...",
+            flush=True
+        )
+
+        response = session.get(
             url,
-            timeout=60
+            timeout=(15, 60)
         )
 
-        image_response.raise_for_status()
+        response.raise_for_status()
 
-        if not image_response.content:
-            raise Exception("Imagen vacía")
 
+        if not response.content:
+
+            raise Exception(
+                "Imagen vacía"
+            )
+
+
+        # ------------------------------------------
         # Abrir imagen
+        # ------------------------------------------
+
         image = Image.open(
-            BytesIO(image_response.content)
+            BytesIO(response.content)
         )
 
-        # Convertir a RGB/RGBA
-        if image.mode in ("RGBA", "LA"):
-            image = image.convert("RGBA")
-        else:
-            image = image.convert("RGB")
+        image.load()
 
+
+        # ------------------------------------------
+        # Convertir
+        # ------------------------------------------
+
+        if image.mode in (
+            "RGBA",
+            "LA"
+        ):
+
+            image = image.convert(
+                "RGBA"
+            )
+
+        else:
+
+            image = image.convert(
+                "RGB"
+            )
+
+
+        # ------------------------------------------
         # Guardar WebP
+        # ------------------------------------------
+
         image.save(
             output_path,
             "WEBP",
@@ -107,28 +262,60 @@ for number, url in enumerate(icon_urls, start=1):
             method=6
         )
 
-        size_kb = os.path.getsize(output_path) / 1024
 
-        print(
-            f"  OK -> {filename} "
-            f"({size_kb:.1f} KB)"
+        size_kb = (
+            os.path.getsize(
+                output_path
+            ) / 1024
         )
 
+
+        print(
+            f"OK -> {filename} "
+            f"({size_kb:.1f} KB)",
+            flush=True
+        )
+
+
+        # ------------------------------------------
+        # Index
+        # ------------------------------------------
+
         index.append({
+            "canal": canal,
+            "name": name,
             "icono": url,
             "archivo": filename
         })
 
+
         successful += 1
 
+
     except Exception as error:
-        print(f"  ERROR -> {error}")
+
+        print(
+            f"ERROR: {error}",
+            flush=True
+        )
+
         failed += 1
 
 
-# Crear índice
+# ==================================================
+# CREAR INDEX.JSON
+# ==================================================
+
+index.sort(
+    key=lambda x: int(x["canal"])
+)
+
+
 with open(
-    os.path.join(ICON_DIR, "index.json"),
+    os.path.join(
+        ICON_DIR,
+        "index.json"
+    ),
     "w",
     encoding="utf-8"
 ) as file:
@@ -141,11 +328,74 @@ with open(
     )
 
 
-print()
-print("======================================")
-print("RESULTADO")
-print("======================================")
-print(f"Encontrados : {len(icon_urls)}")
-print(f"Convertidos : {successful}")
-print(f"Errores     : {failed}")
-print("======================================")
+# ==================================================
+# LIMPIAR ICONOS ANTIGUOS
+# ==================================================
+
+valid_files = {
+    item["archivo"]
+    for item in index
+}
+
+
+for filename in os.listdir(ICON_DIR):
+
+    if (
+        filename.endswith(".webp")
+        and filename not in valid_files
+    ):
+
+        old_file = os.path.join(
+            ICON_DIR,
+            filename
+        )
+
+        os.remove(old_file)
+
+        print(
+            f"Eliminado antiguo: {filename}",
+            flush=True
+        )
+
+
+# ==================================================
+# RESULTADO
+# ==================================================
+
+print("", flush=True)
+
+print(
+    "======================================",
+    flush=True
+)
+
+print(
+    "             RESULTADO",
+    flush=True
+)
+
+print(
+    "======================================",
+    flush=True
+)
+
+print(
+    f"Canales encontrados : {len(channels)}",
+    flush=True
+)
+
+print(
+    f"Convertidos         : {successful}",
+    flush=True
+)
+
+print(
+    f"Errores             : {failed}",
+    flush=True
+)
+
+print(
+    "======================================",
+    flush=True
+)
+```
