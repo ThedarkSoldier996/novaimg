@@ -9,6 +9,11 @@ from PIL import Image
 JSON_FILE = "novaplay.json"
 ICON_DIR = "icons"
 
+GITHUB_BASE_URL = (
+    "https://raw.githubusercontent.com/"
+    "ThedarkSoldier996/novaimg/main/icons/"
+)
+
 os.makedirs(ICON_DIR, exist_ok=True)
 
 print("======================================", flush=True)
@@ -17,7 +22,7 @@ print("======================================", flush=True)
 
 
 # ==================================================
-# LEER NOVAPLAY.JSON
+# LEER JSON
 # ==================================================
 
 print("Leyendo novaplay.json...", flush=True)
@@ -27,63 +32,69 @@ with open(
     "r",
     encoding="utf-8"
 ) as file:
+
     data = json.load(file)
 
 print("JSON cargado correctamente.", flush=True)
 
 
 # ==================================================
-# BUSCAR CANALES CON ICONO
+# PROCESAR CATEGORIAS Y CANALES
 # ==================================================
 
 channels = []
 
 
-def extract_channels(obj):
+def process_structure(obj):
 
-    if isinstance(obj, dict):
-
-        # Canal que contiene icono
-        if "icono" in obj:
-
-            icono = obj.get("icono")
-
-            if (
-                isinstance(icono, str)
-                and icono.startswith(
-                    ("http://", "https://")
-                )
-            ):
-
-                channels.append({
-                    "name": str(
-                        obj.get("name", "")
-                    ),
-                    "icono": icono
-                })
-
-        # Continuar recorriendo
-        for value in obj.values():
-            extract_channels(value)
-
-
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
 
         for item in obj:
-            extract_channels(item)
+
+            process_structure(item)
 
 
-extract_channels(data)
+    elif isinstance(obj, dict):
+
+        # Si tiene items, recorrerlos
+        if isinstance(obj.get("items"), list):
+
+            for item in obj["items"]:
+
+                # Si parece un canal
+                if (
+                    isinstance(item, dict)
+                    and "name" in item
+                ):
+
+                    channels.append(item)
+
+                # También puede ser otra estructura
+                else:
+
+                    process_structure(item)
+
+        else:
+
+            # Buscar estructuras internas
+            for value in obj.values():
+
+                if isinstance(value, (dict, list)):
+
+                    process_structure(value)
+
+
+process_structure(data)
 
 
 print(
-    f"Iconos encontrados: {len(channels)}",
+    f"Canales encontrados: {len(channels)}",
     flush=True
 )
 
 
 # ==================================================
-# DESCARGAR ICONOS EN EL MISMO ORDEN
+# DESCARGAR ICONOS
 # ==================================================
 
 session = requests.Session()
@@ -99,11 +110,12 @@ for position, channel in enumerate(
     start=1
 ):
 
-    name = channel["name"]
-    url = channel["icono"]
+    name = str(
+        channel.get("name", "")
+    )
 
-    # El número depende EXCLUSIVAMENTE
-    # de la posición dentro del JSON.
+    icon_url = channel.get("icono")
+
     filename = f"{position:03d}.webp"
 
     output_path = os.path.join(
@@ -119,13 +131,40 @@ for position, channel in enumerate(
         flush=True
     )
 
+
+    # ----------------------------------------------
+    # Sin icono
+    # ----------------------------------------------
+
+    if not isinstance(
+        icon_url,
+        str
+    ) or not icon_url.startswith(
+        ("http://", "https://")
+    ):
+
+        print(
+            "Sin URL de icono. Se mantiene sin cambios.",
+            flush=True
+        )
+
+        index.append({
+            "numero": position,
+            "name": name,
+            "icono_original": icon_url,
+            "archivo": None
+        })
+
+        continue
+
+
     print(
-        f"URL: {url}",
+        f"Origen: {icon_url}",
         flush=True
     )
 
     print(
-        f"Archivo: {filename}",
+        f"Destino: {filename}",
         flush=True
     )
 
@@ -133,16 +172,11 @@ for position, channel in enumerate(
     try:
 
         # ------------------------------------------
-        # Descargar
+        # Descargar imagen original
         # ------------------------------------------
 
-        print(
-            "Descargando...",
-            flush=True
-        )
-
         response = session.get(
-            url,
+            icon_url,
             timeout=(15, 60)
         )
 
@@ -168,7 +202,7 @@ for position, channel in enumerate(
 
 
         # ------------------------------------------
-        # Convertir
+        # Convertir a WebP
         # ------------------------------------------
 
         if image.mode in (
@@ -199,29 +233,33 @@ for position, channel in enumerate(
         )
 
 
-        size_kb = (
-            os.path.getsize(
-                output_path
-            ) / 1024
-        )
-
-
         print(
-            f"OK -> {filename} "
-            f"({size_kb:.1f} KB)",
+            f"OK -> {filename}",
             flush=True
         )
 
 
         # ------------------------------------------
-        # Guardar información
+        # URL nueva de GitHub
         # ------------------------------------------
+
+        github_url = (
+            GITHUB_BASE_URL
+            + filename
+        )
+
+
+        # IMPORTANTE:
+        # Solo reemplazamos icono.
+        channel["icono"] = github_url
+
 
         index.append({
             "numero": position,
             "name": name,
-            "icono": url,
-            "archivo": filename
+            "icono": github_url,
+            "archivo": filename,
+            "icono_original": icon_url
         })
 
 
@@ -235,20 +273,56 @@ for position, channel in enumerate(
             flush=True
         )
 
+        # Si falla la descarga,
+        # NO reemplazamos el icono original.
+
+        index.append({
+            "numero": position,
+            "name": name,
+            "icono": icon_url,
+            "archivo": None
+        })
+
         failed += 1
 
 
 # ==================================================
-# GUARDAR INDEX.JSON
+# GUARDAR NOVAPLAY.JSON
 # ==================================================
 
 print("", flush=True)
 
 print(
-    "Generando index.json...",
+    "Actualizando únicamente los campos icono...",
     flush=True
 )
 
+
+with open(
+    JSON_FILE,
+    "w",
+    encoding="utf-8"
+) as file:
+
+    json.dump(
+        data,
+        file,
+        ensure_ascii=False,
+        indent=2
+    )
+
+    file.write("\n")
+
+
+print(
+    "novaplay.json actualizado.",
+    flush=True
+)
+
+
+# ==================================================
+# GUARDAR INDEX.JSON
+# ==================================================
 
 with open(
     os.path.join(
@@ -266,14 +340,17 @@ with open(
         indent=2
     )
 
+    file.write("\n")
+
 
 # ==================================================
-# ELIMINAR ICONOS SOBRANTES
+# ELIMINAR WEBP SOBRANTES
 # ==================================================
 
 valid_files = {
     item["archivo"]
     for item in index
+    if item["archivo"]
 }
 
 
@@ -284,12 +361,12 @@ for filename in os.listdir(ICON_DIR):
         and filename not in valid_files
     ):
 
-        path = os.path.join(
-            ICON_DIR,
-            filename
+        os.remove(
+            os.path.join(
+                ICON_DIR,
+                filename
+            )
         )
-
-        os.remove(path)
 
         print(
             f"Eliminado antiguo: {filename}",
@@ -319,12 +396,12 @@ print(
 )
 
 print(
-    f"Iconos encontrados : {len(channels)}",
+    f"Canales encontrados : {len(channels)}",
     flush=True
 )
 
 print(
-    f"Convertidos        : {successful}",
+    f"Iconos convertidos  : {successful}",
     flush=True
 )
 
