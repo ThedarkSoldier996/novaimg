@@ -16,16 +16,26 @@ print("       NOVAPLAY ICON SYNC", flush=True)
 print("======================================", flush=True)
 
 
-# Leer novaplay.json
+# ==================================================
+# LEER NOVAPLAY.JSON
+# ==================================================
+
 print("Leyendo novaplay.json...", flush=True)
 
-with open(JSON_FILE, "r", encoding="utf-8") as file:
+with open(
+    JSON_FILE,
+    "r",
+    encoding="utf-8"
+) as file:
     data = json.load(file)
 
 print("JSON cargado correctamente.", flush=True)
 
 
-# Buscar canales
+# ==================================================
+# BUSCAR CANALES CON ICONO
+# ==================================================
+
 channels = []
 
 
@@ -33,25 +43,29 @@ def extract_channels(obj):
 
     if isinstance(obj, dict):
 
-        if "canal" in obj and "icono" in obj:
+        # Canal que contiene icono
+        if "icono" in obj:
 
-            canal = obj.get("canal")
-            nombre = obj.get("name", "")
             icono = obj.get("icono")
 
             if (
-                canal is not None
-                and isinstance(icono, str)
-                and icono.startswith(("http://", "https://"))
+                isinstance(icono, str)
+                and icono.startswith(
+                    ("http://", "https://")
+                )
             ):
+
                 channels.append({
-                    "canal": str(canal),
-                    "name": str(nombre),
+                    "name": str(
+                        obj.get("name", "")
+                    ),
                     "icono": icono
                 })
 
+        # Continuar recorriendo
         for value in obj.values():
             extract_channels(value)
+
 
     elif isinstance(obj, list):
 
@@ -61,39 +75,17 @@ def extract_channels(obj):
 
 extract_channels(data)
 
+
 print(
-    f"Canales encontrados: {len(channels)}",
+    f"Iconos encontrados: {len(channels)}",
     flush=True
 )
 
 
-# Eliminar canales duplicados
-unique_channels = {}
+# ==================================================
+# DESCARGAR ICONOS EN EL MISMO ORDEN
+# ==================================================
 
-for channel in channels:
-
-    canal = channel["canal"]
-
-    if canal not in unique_channels:
-        unique_channels[canal] = channel
-
-
-channels = list(unique_channels.values())
-
-
-# Ordenar por número de canal
-def sort_channel(channel):
-
-    try:
-        return int(channel["canal"])
-    except ValueError:
-        return 999999
-
-
-channels.sort(key=sort_channel)
-
-
-# Descargar y convertir
 session = requests.Session()
 
 successful = 0
@@ -102,35 +94,47 @@ failed = 0
 index = []
 
 
-for channel in channels:
+for position, channel in enumerate(
+    channels,
+    start=1
+):
 
-    canal = channel["canal"]
     name = channel["name"]
     url = channel["icono"]
 
+    # El número depende EXCLUSIVAMENTE
+    # de la posición dentro del JSON.
+    filename = f"{position:03d}.webp"
+
+    output_path = os.path.join(
+        ICON_DIR,
+        filename
+    )
+
+
     print("", flush=True)
-    print(f"Canal: {canal}", flush=True)
-    print(f"Nombre: {name}", flush=True)
-    print(f"URL: {url}", flush=True)
+
+    print(
+        f"[{position}/{len(channels)}] {name}",
+        flush=True
+    )
+
+    print(
+        f"URL: {url}",
+        flush=True
+    )
+
+    print(
+        f"Archivo: {filename}",
+        flush=True
+    )
+
 
     try:
 
-        canal_number = int(canal)
-
-        # Canal 1 = 001.webp
-        # Canal 25 = 025.webp
-        # Canal 100 = 100.webp
-        filename = f"{canal_number:03d}.webp"
-
-        output_path = os.path.join(
-            ICON_DIR,
-            filename
-        )
-
-        print(
-            f"Archivo: {filename}",
-            flush=True
-        )
+        # ------------------------------------------
+        # Descargar
+        # ------------------------------------------
 
         print(
             "Descargando...",
@@ -144,33 +148,48 @@ for channel in channels:
 
         response.raise_for_status()
 
+
         if not response.content:
-            raise Exception("Imagen vacía")
 
-        print(
-            f"Descargado: "
-            f"{len(response.content) / 1024:.1f} KB",
-            flush=True
-        )
+            raise Exception(
+                "Imagen vacía"
+            )
 
+
+        # ------------------------------------------
         # Abrir imagen
+        # ------------------------------------------
+
         image = Image.open(
             BytesIO(response.content)
         )
 
         image.load()
 
-        # Convertir
-        if image.mode in ("RGBA", "LA"):
-            image = image.convert("RGBA")
-        else:
-            image = image.convert("RGB")
 
+        # ------------------------------------------
+        # Convertir
+        # ------------------------------------------
+
+        if image.mode in (
+            "RGBA",
+            "LA"
+        ):
+
+            image = image.convert(
+                "RGBA"
+            )
+
+        else:
+
+            image = image.convert(
+                "RGB"
+            )
+
+
+        # ------------------------------------------
         # Guardar WebP
-        print(
-            "Convirtiendo a WebP...",
-            flush=True
-        )
+        # ------------------------------------------
 
         image.save(
             output_path,
@@ -179,9 +198,13 @@ for channel in channels:
             method=6
         )
 
+
         size_kb = (
-            os.path.getsize(output_path) / 1024
+            os.path.getsize(
+                output_path
+            ) / 1024
         )
+
 
         print(
             f"OK -> {filename} "
@@ -189,14 +212,21 @@ for channel in channels:
             flush=True
         )
 
+
+        # ------------------------------------------
+        # Guardar información
+        # ------------------------------------------
+
         index.append({
-            "canal": canal,
+            "numero": position,
             "name": name,
             "icono": url,
             "archivo": filename
         })
 
+
         successful += 1
+
 
     except Exception as error:
 
@@ -208,18 +238,23 @@ for channel in channels:
         failed += 1
 
 
-# Ordenar index.json por canal
-index.sort(
-    key=lambda item: int(item["canal"])
+# ==================================================
+# GUARDAR INDEX.JSON
+# ==================================================
+
+print("", flush=True)
+
+print(
+    "Generando index.json...",
+    flush=True
 )
 
 
-# Guardar index.json
-print("", flush=True)
-print("Generando index.json...", flush=True)
-
 with open(
-    os.path.join(ICON_DIR, "index.json"),
+    os.path.join(
+        ICON_DIR,
+        "index.json"
+    ),
     "w",
     encoding="utf-8"
 ) as file:
@@ -232,7 +267,10 @@ with open(
     )
 
 
-# Eliminar WebP de canales que ya no existen
+# ==================================================
+# ELIMINAR ICONOS SOBRANTES
+# ==================================================
+
 valid_files = {
     item["archivo"]
     for item in index
@@ -254,26 +292,48 @@ for filename in os.listdir(ICON_DIR):
         os.remove(path)
 
         print(
-            f"Eliminado: {filename}",
+            f"Eliminado antiguo: {filename}",
             flush=True
         )
 
 
-# Resultado
+# ==================================================
+# RESULTADO
+# ==================================================
+
 print("", flush=True)
-print("======================================", flush=True)
-print("             RESULTADO", flush=True)
-print("======================================", flush=True)
+
 print(
-    f"Canales encontrados : {len(channels)}",
+    "======================================",
     flush=True
 )
+
 print(
-    f"Convertidos         : {successful}",
+    "             RESULTADO",
     flush=True
 )
+
+print(
+    "======================================",
+    flush=True
+)
+
+print(
+    f"Iconos encontrados : {len(channels)}",
+    flush=True
+)
+
+print(
+    f"Convertidos        : {successful}",
+    flush=True
+)
+
 print(
     f"Errores             : {failed}",
     flush=True
 )
-print("======================================", flush=True)
+
+print(
+    "======================================",
+    flush=True
+)
