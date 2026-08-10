@@ -9,12 +9,13 @@ from PIL import Image
 JSON_FILE = "novaplay.json"
 ICON_DIR = "icons"
 
-GITHUB_BASE_URL = (
+GITHUB_ICON_URL = (
     "https://raw.githubusercontent.com/"
     "ThedarkSoldier996/novaimg/main/icons/"
 )
 
 os.makedirs(ICON_DIR, exist_ok=True)
+
 
 print("======================================", flush=True)
 print("       NOVAPLAY ICON SYNC", flush=True)
@@ -22,79 +23,61 @@ print("======================================", flush=True)
 
 
 # ==================================================
-# LEER JSON
+# LEER EL JSON ORIGINAL
 # ==================================================
-
-print("Leyendo novaplay.json...", flush=True)
 
 with open(
     JSON_FILE,
     "r",
     encoding="utf-8"
 ) as file:
-
     data = json.load(file)
-
-print("JSON cargado correctamente.", flush=True)
-
-
-# ==================================================
-# PROCESAR CATEGORIAS Y CANALES
-# ==================================================
-
-channels = []
-
-
-def process_structure(obj):
-
-    if isinstance(obj, list):
-
-        for item in obj:
-
-            process_structure(item)
-
-
-    elif isinstance(obj, dict):
-
-        # Si tiene items, recorrerlos
-        if isinstance(obj.get("items"), list):
-
-            for item in obj["items"]:
-
-                # Si parece un canal
-                if (
-                    isinstance(item, dict)
-                    and "name" in item
-                ):
-
-                    channels.append(item)
-
-                # También puede ser otra estructura
-                else:
-
-                    process_structure(item)
-
-        else:
-
-            # Buscar estructuras internas
-            for value in obj.values():
-
-                if isinstance(value, (dict, list)):
-
-                    process_structure(value)
-
-
-process_structure(data)
 
 
 print(
-    f"Canales encontrados: {len(channels)}",
+    "novaplay.json cargado correctamente.",
     flush=True
 )
 
 
 # ==================================================
-# DESCARGAR ICONOS
+# RECORRER CATEGORÍAS Y CANALES
+# ==================================================
+
+channels = []
+
+
+if isinstance(data, list):
+
+    for category in data:
+
+        if not isinstance(category, dict):
+            continue
+
+        items = category.get("items")
+
+        if not isinstance(items, list):
+            continue
+
+        for item in items:
+
+            if not isinstance(item, dict):
+                continue
+
+            # Solo canales que tienen icono
+            if "icono" in item:
+
+                channels.append(item)
+
+
+print(
+    f"Canales con icono encontrados: {len(channels)}",
+    flush=True
+)
+
+
+# ==================================================
+# DESCARGAR Y CONVERTIR
 # ==================================================
 
 session = requests.Session()
@@ -110,11 +93,14 @@ for position, channel in enumerate(
     start=1
 ):
 
-    name = str(
-        channel.get("name", "")
+    name = channel.get(
+        "name",
+        ""
     )
 
-    icon_url = channel.get("icono")
+    original_url = channel.get(
+        "icono"
+    )
 
     filename = f"{position:03d}.webp"
 
@@ -131,52 +117,51 @@ for position, channel in enumerate(
         flush=True
     )
 
+    print(
+        f"Original: {original_url}",
+        flush=True
+    )
 
-    # ----------------------------------------------
-    # Sin icono
-    # ----------------------------------------------
+    print(
+        f"Archivo: {filename}",
+        flush=True
+    )
+
+
+    # ==================================================
+    # VALIDAR URL
+    # ==================================================
 
     if not isinstance(
-        icon_url,
+        original_url,
         str
-    ) or not icon_url.startswith(
+    ) or not original_url.startswith(
         ("http://", "https://")
     ):
 
         print(
-            "Sin URL de icono. Se mantiene sin cambios.",
+            "URL inválida. Se mantiene sin modificar.",
             flush=True
         )
 
         index.append({
             "numero": position,
             "name": name,
-            "icono_original": icon_url,
+            "icono": original_url,
             "archivo": None
         })
 
         continue
 
 
-    print(
-        f"Origen: {icon_url}",
-        flush=True
-    )
-
-    print(
-        f"Destino: {filename}",
-        flush=True
-    )
-
-
     try:
 
-        # ------------------------------------------
-        # Descargar imagen original
-        # ------------------------------------------
+        # ==================================================
+        # DESCARGAR IMAGEN ORIGINAL
+        # ==================================================
 
         response = session.get(
-            icon_url,
+            original_url,
             timeout=(15, 60)
         )
 
@@ -186,13 +171,13 @@ for position, channel in enumerate(
         if not response.content:
 
             raise Exception(
-                "Imagen vacía"
+                "La imagen descargada está vacía."
             )
 
 
-        # ------------------------------------------
-        # Abrir imagen
-        # ------------------------------------------
+        # ==================================================
+        # ABRIR IMAGEN
+        # ==================================================
 
         image = Image.open(
             BytesIO(response.content)
@@ -201,9 +186,9 @@ for position, channel in enumerate(
         image.load()
 
 
-        # ------------------------------------------
-        # Convertir a WebP
-        # ------------------------------------------
+        # ==================================================
+        # CONVERTIR A WEBP
+        # ==================================================
 
         if image.mode in (
             "RGBA",
@@ -221,10 +206,6 @@ for position, channel in enumerate(
             )
 
 
-        # ------------------------------------------
-        # Guardar WebP
-        # ------------------------------------------
-
         image.save(
             output_path,
             "WEBP",
@@ -233,33 +214,44 @@ for position, channel in enumerate(
         )
 
 
-        print(
-            f"OK -> {filename}",
-            flush=True
-        )
+        # ==================================================
+        # NUEVA URL
+        # ==================================================
 
-
-        # ------------------------------------------
-        # URL nueva de GitHub
-        # ------------------------------------------
-
-        github_url = (
-            GITHUB_BASE_URL
+        new_url = (
+            GITHUB_ICON_URL
             + filename
         )
 
 
-        # IMPORTANTE:
-        # Solo reemplazamos icono.
-        channel["icono"] = github_url
+        # ==================================================
+        # MODIFICAR ÚNICAMENTE "icono"
+        # ==================================================
 
+        channel["icono"] = new_url
+
+
+        print(
+            f"OK: {filename}",
+            flush=True
+        )
+
+        print(
+            f"Nueva URL: {new_url}",
+            flush=True
+        )
+
+
+        # ==================================================
+        # INDEX
+        # ==================================================
 
         index.append({
             "numero": position,
             "name": name,
-            "icono": github_url,
+            "icono": new_url,
             "archivo": filename,
-            "icono_original": icon_url
+            "icono_original": original_url
         })
 
 
@@ -273,14 +265,13 @@ for position, channel in enumerate(
             flush=True
         )
 
-        # Si falla la descarga,
-        # NO reemplazamos el icono original.
-
+        # Si falla, NO cambia el icono
         index.append({
             "numero": position,
             "name": name,
-            "icono": icon_url,
-            "archivo": None
+            "icono": original_url,
+            "archivo": None,
+            "error": str(error)
         })
 
         failed += 1
@@ -293,7 +284,7 @@ for position, channel in enumerate(
 print("", flush=True)
 
 print(
-    "Actualizando únicamente los campos icono...",
+    "Guardando novaplay.json...",
     flush=True
 )
 
@@ -344,13 +335,13 @@ with open(
 
 
 # ==================================================
-# ELIMINAR WEBP SOBRANTES
+# ELIMINAR WEBP QUE YA NO EXISTAN
 # ==================================================
 
 valid_files = {
     item["archivo"]
     for item in index
-    if item["archivo"]
+    if item.get("archivo")
 }
 
 
@@ -361,15 +352,15 @@ for filename in os.listdir(ICON_DIR):
         and filename not in valid_files
     ):
 
-        os.remove(
-            os.path.join(
-                ICON_DIR,
-                filename
-            )
+        path = os.path.join(
+            ICON_DIR,
+            filename
         )
 
+        os.remove(path)
+
         print(
-            f"Eliminado antiguo: {filename}",
+            f"Eliminado: {filename}",
             flush=True
         )
 
@@ -401,7 +392,7 @@ print(
 )
 
 print(
-    f"Iconos convertidos  : {successful}",
+    f"Convertidos         : {successful}",
     flush=True
 )
 
