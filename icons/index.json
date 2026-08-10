@@ -1326,7 +1326,8 @@
     "numero": 190,
     "name": "RT - RUSSIA TODAY",
     "icono": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Russia-today-logo.svg/250px-Russia-today-logo.svg.png",
-    "archivo": null
+    "archivo": null,
+    "error": "403 Client Error: Forbidden for url: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Russia-today-logo.svg/250px-Russia-today-logo.svg.png"
   },
   {
     "numero": 191,
@@ -1367,7 +1368,8 @@
     "numero": 196,
     "name": "FRANCE24",
     "icono": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/250px-France24.png",
-    "archivo": null
+    "archivo": null,
+    "error": "403 Client Error: Forbidden for url: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/250px-France24.png"
   },
   {
     "numero": 197,
@@ -2990,49 +2992,57 @@
     "numero": 428,
     "name": "XITE HITS",
     "icono": "https://i.imgur.com/N51Rp7E.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/N51Rp7E.png"
   },
   {
     "numero": 429,
     "name": "XITE LIVE",
     "icono": "https://i.imgur.com/N51Rp7E.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/N51Rp7E.png"
   },
   {
     "numero": 430,
     "name": "XITE 8OS FLASHBACK",
     "icono": "https://i.imgur.com/vwpOzuz.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/vwpOzuz.png"
   },
   {
     "numero": 431,
     "name": "XITE 90S THROWBACK",
     "icono": "https://i.imgur.com/vwpOzuz.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/vwpOzuz.png"
   },
   {
     "numero": 432,
     "name": "XITE CELEBRIDADES",
     "icono": "https://i.imgur.com/coSrUwV.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/coSrUwV.png"
   },
   {
     "numero": 433,
     "name": "XITE NUEVO LATINO",
     "icono": "https://i.imgur.com/2qyl2y3.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/2qyl2y3.png"
   },
   {
     "numero": 434,
     "name": "XITE SIEMPRE LATINO",
     "icono": "https://i.imgur.com/bwmIEgG.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/bwmIEgG.png"
   },
   {
     "numero": 435,
     "name": "XITE ROCK ON",
     "icono": "https://i.imgur.com/uIIUIuN.png",
-    "archivo": null
+    "archivo": null,
+    "error": "429 Client Error: Unknown Error for url: https://i.imgur.com/uIIUIuN.png"
   },
   {
     "numero": 436,
