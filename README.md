@@ -33,4 +33,6 @@ Todos los recursos se sirven a través de la infraestructura de GitHub Raw, lo q
 
 Este repositorio es para uso técnico exclusivo de la aplicación NovaPlay. Todos los logotipos y marcas comerciales aquí alojados son propiedad de sus respectivos dueños legales y se utilizan únicamente con fines descriptivos e identificativos.
 
-© 2024-2026 M.S.G.T SOLUTIONS. Todos los derechos reservados.
+Desarrollado con ❤️ por ThedarkSoldier996
+
+© 2010 - 2026 M.S.G.T SOLUTIONS. 
