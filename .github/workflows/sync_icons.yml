@@ -1,0 +1,44 @@
+name: Sync Assets
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Destination
+        uses: actions/checkout@v4
+        with:
+          path: dest
+
+      - name: Clone Source Privately
+        run: |
+          # Clonamos usando el secreto para no dejar rastro en el YAML
+          git clone --depth 1 --filter=blob:none --sparse ${{ secrets.SOURCE_REPO_URL }} src
+          cd src
+          git sparse-checkout set icons
+          cd ..
+
+      - name: Mirror Icons
+        run: |
+          # Sincronización exacta de carpetas
+          rsync -av --delete src/icons/ dest/icons/
+
+      - name: Push Updates
+        run: |
+          cd dest
+          git config --local user.email "action@github.com"
+          git config --local user.name "AssetSync Bot"
+          git add icons/
+          if git diff --staged --quiet; then
+            echo "Sin cambios."
+          else
+            git commit -m "Update: Sincronizacion de activos del ecosistema"
+            git push
+          fi

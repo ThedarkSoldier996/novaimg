@@ -1,0 +1,41 @@
+name: Update NovaPlay Icons
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "novaplay.json"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests pillow
+
+      - name: Sync icons
+        run: python -u sync_icons.py
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add novaplay.json icons
+          if git diff --cached --quiet; then
+            echo "No hay cambios."
+          else
+            git commit -m "Update NovaPlay icons"
+            git push
+          fi
